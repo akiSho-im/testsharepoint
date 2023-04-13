@@ -1,0 +1,139 @@
+Note TMHK 
+
+
+【BPMS and KPI monitoring】
+
+3 objectivies can be reached through BPMS:
+
+　1. visualize the process 
+    >users can handle progress though visualized business process
+     e.g. graph,process model
+
+　2. visualzie the KPI monitoring 
+　　> can monitor KPI performance in real-time though visualized images 
+　　> data are automatically visualized 
+ 
+　3．enable constant problem handeling 
+　　> alert will be sent automatically to the administrator 
+
+【phase0 TMHKInvestigation02】
+
+・Start event
+　all users who own im_bpm_user role are able to start the WF
+
+・Parallel Gateway
+　if the task holds force_termination_signal, the case will automatically move to terminal end event
+ (the casse will close compulsorly)
+
+・Reopen Exclusive Gateway 
+　will determine whether the case is a re-open case or not through poc_reopen_flg flag 
+　>if poc_reopen_flg exists, move to the Handler Reopen Decision task
+　>if poc_reopen_flg does not exist, move to check documents exclusive gateway
+
+・Handler Reopen Decesion 
+　a user task responsible for IT Department users
+　>use application screen edited by formaDesigner 
+　
+・Re-assessmentor Payment Adjustment Exclusive Gateway
+　an exclusive gateway which defines whetherit is a re-assessment case or a payment adjustment case
+　>if poc_reassessment_flg exists, move to the check_documents exclusive gateway
+　>if poc_reassessment_flg does not exist, move on to the Decision Making user task 
+
+・Decision Making task
+　a user task assigned by users who own poc_handler_cd 
+　>this user task is following the due date being established by kpi_decision_make_duedate
+　>the handler will enter the decision_result_status 
+
+・Decision Making Result
+　the case will branch by the validate being entered during the previous user task (Decision Making task)
+　>when the decision_result_status is "offer", move to Declaration user task
+　>when the decision_result_status is "decline", move to Operate as Declined CLaim user task
+
+・Declaration user task
+　a user task assigned by users who own poc_handler_cd
+  due date is following the variable being defined by kpi_offer_duedate
+　>use several Logics 
+　※中身不明であるため確認すること
+
+・Send an Offer Letter 
+　a user task assigned by users who own poc_handler_cd
+　due date is following the variable being defined by kpi_offer_duedate
+　>use  Logics to send an offer letter to the client
+　>set overdue alert
+　>get EsResult through LD
+　>set PID
+　>set execution ID
+　※中身不明であるため確認すること
+　
+・CLient Response intermediate event
+　
+　>set KPI variable date
+　>send poc_offer_response_msg being established in the main process
+
+・Operate as Declined Claim user task
+　this user task is being handled by users who own poc_handler_cd
+　>this user task is following the due date being established by kpi_decline_duedate
+　>poc_client_objection_wait_flg will be established during this user task
+
+・Client Objection Receive(3 months)
+　poc_decline_response_msg which is being defined in the process will catch following variables:
+　>KPI duedate
+　※あまり理解できていないため確認すること
+　>if the case does not have poc_decline_accepted_flg, move on to Resume Escalation user task 
+　>if the case have poc_decline_accepted_flg,the case will be inactivated and move to CHange the Status as "Inactive"user task
+
+・Change the Status as "Inactive" user task
+　a user task which is being handled by users who own poc_handler_cd 
+　>the handler manually change the status into "inactivate" through poc_inactivation_confirm screen and move on to the Close/Re-activate Waiting Event
+
+・Resume Escalation user task 
+　a user task being handled by users who own poc_handler_cd 
+　>manager will be categorized as marine/non-marine manager and assigned 
+　>will update the process index
+　>error messages being localized (EN/JP/CHN)will be send to the handler? 
+
+・Re-assessment Decision user task 
+　a user task being handled by users who own poc_handler_cd 
+　>the manager being assigned by previous user task will make re-assessment decision, which is to verify the case as approved or rejected one 
+　※LDの中身あまりできていないため確認すること
+　>poc_resume_approval_flg will be established in this user task 
+
+・Approve or Reject Exclusive Gateway
+　an exclusive gate way that define which branch should the case move on
+　>when the case holds poc_resume_approval_flag, get back to Check documents Exclusive Gateway
+　>when the case does not hold poc_resume_approval_flag, move to Operate as Declined Claim user task
+ 
+
+・Declaration user task
+　this user task is being handled by users who own poc_handler_cd
+　>this user task is following the due date being established by kpi_offer_duedate
+
+
+・Check documents Exclusive gateway
+　call out Logic Design that chek document status  　
+　>if the variable of poc_resume_approval_flg and poc_reactivate_flg is null,the progress will terminate
+　>if the document is a resume approval case, the process will terminate 
+　>if the case's reactive is true/the offer accepted status is false, the logic will provide a reaction inrement number and set up initial state variable
+　>once the logic closed, move on to the cancel follow up gateway 
+　>check whether documents holds following flags and decide which branch to move on 
+   -poc_reactive_flg
+   -poc_resme_approval_flg
+   -poc_offer_accepted_flg
+
+・Cancel Follow up Exclisive Gateway 
+　an exclusive gateway which determine whether the case needa cancel follow up operation 
+　>if there is a poc_followup_cancel_flg,there will be no follow up support service and the case will terminate immediately 
+
+・Cycle time exceed Exclusive Gateway
+　call out Logic Design which count process instance ID(PID) to determine whether repeat the follow up WorkFLow or not 
+ >when PID is empty, variable kpi_followup_is_exit will be delivered as the output of the Logic, therefore move to Change the Status as "Inactive" usertask 
+　
+
+・Change the Status as "Inactive" task
+　a user task which is being handled by users who own poc_handler_cd 
+　>the handler manually change the status into "inactivate" through poc_inactivation_confirm screen and move on to the Close/Re-activate Waiting Event
+
+・Request the Documents task
+　a draft task using IM-BIS-Workflow, this task will be repeated untill the cycle time has being exceeded
+ 
+
